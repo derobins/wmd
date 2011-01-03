@@ -1,9 +1,14 @@
+//edContext: I update this from within some functions
+//maybe you find some use for it as well
+//if not you may delete it and all references
+
+edContext = "";
 var Attacklab = Attacklab || {};
 
-Attacklab.wmdBase = function(){
+Attacklab.wmdBase = function(attBase){
 
 	// A few handy aliases for readability.
-	var wmd  = top.Attacklab;
+	var wmd  = attBase;
 	var doc  = top.document;
 	var re   = top.RegExp;
 	var nav  = top.navigator;
@@ -26,7 +31,14 @@ Attacklab.wmdBase = function(){
 	global.isIE_7plus 	= global.isIE && !global.isIE_5or6;
 	global.isOpera 		= /opera/.test(nav.userAgent.toLowerCase());
 	global.isKonqueror 	= /konqueror/.test(nav.userAgent.toLowerCase());
+    global.isFirefox 	= /firefox/.test(nav.userAgent.toLowerCase());
 	
+	global.insertChar   = "";
+	global.fileCons = "";
+	global.isImage = false;
+	global.killHandle
+    global.gbloadwin;	
+    global.edContext = "";
 	
 	// -------------------------------------------------------------------
 	//  YOUR CHANGES GO HERE
@@ -37,8 +49,8 @@ Attacklab.wmdBase = function(){
 	
 	// The text that appears on the upper part of the dialog box when
 	// entering links.
-	var imageDialogText = "<p style='margin-top: 0px'><b>Enter the image URL.</b></p><p>You can also add a title, which will be displayed as a tool tip.</p><p>Example:<br />http://wmd-editor.com/images/cloud1.jpg   \"Optional title\"</p>";
-	var linkDialogText = "<p style='margin-top: 0px'><b>Enter the web address.</b></p><p>You can also add a title, which will be displayed as a tool tip.</p><p>Example:<br />http://wmd-editor.com/   \"Optional title\"</p>";
+	var imageDialogText = "<p style='margin-top: 0px'><b>Faciliteu URL imatge extern.</b></p><p>Es pot afegir un títol. El títol es mostrará com pop-up.</p><p>Mostra:<br />http://wmd-editor.com/images/cloud1.jpg   \"Títol opcional\"</p>";
+	var linkDialogText = "<p style='margin-top: 0px'><b>Faciliteu la direcció de un web extern.</b></p><p>Es pot afegir un títol. El títol es mostrará com pop-up.</p><p>Mostra:<br />http://wmd-editor.com/   \"Títol opcional\"</p>";
 	
 	// The default text that appears in the dialog input box when entering
 	// links.
@@ -64,9 +76,9 @@ Attacklab.wmdBase = function(){
 	// A collection of the important regions on the page.
 	// Cached so we don't have to keep traversing the DOM.
 	wmd.PanelCollection = function(){
-		this.buttonBar = doc.getElementById("wmd-button-bar");
-		this.preview = doc.getElementById("wmd-preview");
-		this.output = doc.getElementById("wmd-output");
+		this.buttonBar = jQuery("#wmd-button-bar");
+        this.preview = jQuery("#wmd-preview");
+        this.output = jQuery("#wmd-output");
 		this.input = doc.getElementById("wmd-input");
 	};
 	
@@ -88,6 +100,7 @@ Attacklab.wmdBase = function(){
 	// normally since the focus never leaves the textarea.
 	wmd.ieCachedRange = null;		// cached textarea selection
 	wmd.ieRetardedClick = false;	// flag
+
 	
 	// Returns true if the DOM element is visible, false if it's hidden.
 	// Checks if display is anything other than none.
@@ -174,6 +187,7 @@ Attacklab.wmdBase = function(){
 		return new RegExp(pattern, flags);
 	}
 
+
 	
 	// Sets the image for a button passed to the WMD editor.
 	// Returns a new element with the image attached.
@@ -189,6 +203,37 @@ Attacklab.wmdBase = function(){
 		return elem;
 	};
 	
+
+    util.extern = function(insSpecChr)
+    {
+        global.insertChar = "";
+        var myRetFunc = function()
+        {
+            if (global.insertChar != "") insSpecChr(global.insertChar);
+        };
+        edContext = global.edContext;
+        //Hook your function here: I used greybox to load a character map for example that allows to escape reserved markdown characters (+_[] etc.) and extended characters
+        //in your function page you have access to the global.insertChar for example using the attacklab object returned by the constructor...
+        //top.GB_show('Caràcters especials...', wikiJSTrans + '?ruri=' + escape(wikiInject + 'editor/specialchar.html') + '&cb=jCallBack&uuid=' + new Date().getTime(), 500, 500, myRetFunc);
+        return false;
+    }
+    
+    
+    util.filemanager = function(insFile)
+    {
+        global.fileCons = "";
+        global.isImage = false;
+        var myRetFunc = function()
+        {
+            if (global.fileCons != "") insFile(global.fileCons, global.isImage);
+        };
+        //alert(wikiFPath
+        edContext = global.edContext;
+        //Hook your function here: I used greybox to load files uploaded by the user and other pages of the wiki system I'm setting up with wmd
+        //in your function page you have access to the global.fileCons for example using the attacklab object returned by the constructor...
+        //top.GB_show('Pujar fitxers...', wikiJSTrans + '?ruri=' + escape(wikiInject + 'wikilinker.aspx?or=y&ft=multiUpload&wfp=' + forumFPath) + '&cb=jCallBack&uuid=' + new Date().getTime(), 500, 500, myRetFunc);
+        
+    }
 
 	// This simulates a modal dialog box and asks for the URL when you
 	// click the hyperlink or image buttons.
@@ -341,7 +386,7 @@ Attacklab.wmdBase = function(){
 			var cancelButton = doc.createElement("input");
 			cancelButton.type = "button";
 			cancelButton.onclick = function(){ return close(true); };
-			cancelButton.value = "Cancel";
+			cancelButton.value = "Cancelar";
 			style = cancelButton.style;
 			style.margin = "10px";
 			style.display = "inline";
@@ -472,30 +517,56 @@ Attacklab.wmdBase = function(){
 		// Stored start, end and text.  Used to see if there are changes to the input.
 		var lastStart;
 		var lastEnd;
+		var lastRows = 0;
 		var markdown;
-		
-		var killHandle; // Used to cancel monitoring on destruction.
+		global.killHandle = null;
+		//var killHandle; // Used to cancel monitoring on destruction.
 		// Checks to see if anything has changed in the textarea.
 		// If so, it runs the callback.
 		this.tick = function(){
 		
-			if (!util.isVisible(inputArea)) {
-				return;
+            try
+            {		
+			    if (!util.isVisible(inputArea) || doc.getElementById("wikieditor").style.display == "none") {
+				    return;
+			    }
+    			
+    			//resize the height of the input area
+    			//this avoids scrollbars for the textarea 
+    			//and allows to keep the input and the preview to run side by side... with only one main scrollbar for the entire page
+    			var linesToMatch = inputArea.value;
+    			var lineMatches = linesToMatch.match(/\n/g);
+    			
+    		    var currRows = lineMatches.length * 20;
+    		    //
+    		    if (currRows != lastRows)
+    		    {
+	        	    inputArea.style.height = currRows + "px";
+	        	    //headerLevel = re.lastMatch.length;
+	        	    //alert(currRows);
+	        	    
+	        	    lastRows = currRows;
+	        	}
+		        
+    			
+			    // Update the selection start and end, text.
+			    if (inputArea.selectionStart || inputArea.selectionStart === 0) {
+				    var start = inputArea.selectionStart;
+				    var end = inputArea.selectionEnd;
+				    if (start != lastStart || end != lastEnd) {
+					    lastStart = start;
+					    lastEnd = end;
+    					
+					    if (markdown != inputArea.value) {
+						    markdown = inputArea.value;
+						    return true;
+					    }
+				    }
+			    }
+    			
 			}
-			
-			// Update the selection start and end, text.
-			if (inputArea.selectionStart || inputArea.selectionStart === 0) {
-				var start = inputArea.selectionStart;
-				var end = inputArea.selectionEnd;
-				if (start != lastStart || end != lastEnd) {
-					lastStart = start;
-					lastEnd = end;
-					
-					if (markdown != inputArea.value) {
-						markdown = inputArea.value;
-						return true;
-					}
-				}
+			catch(e)
+			{
 			}
 			return false;
 		};
@@ -516,11 +587,12 @@ Attacklab.wmdBase = function(){
 		// Set how often we poll the textarea for changes.
 		var assignInterval = function(){
 			// previewPollInterval is set at the top of the namespace.
-			killHandle = top.setInterval(doTickCallback, interval);
+			//killHandle = top.setInterval(doTickCallback, interval);
+			global.killHandle = top.setInterval(doTickCallback, interval);
 		};
 		
 		this.destroy = function(){
-			top.clearInterval(killHandle);
+			top.clearInterval(global.killHandle);
 		};
 		
 		assignInterval();
@@ -623,7 +695,8 @@ Attacklab.wmdBase = function(){
 		
 		// Push the input area state to the stack.
 		var saveState = function(){
-		
+		    try
+		    {
 			var currState = inputStateObj || new wmd.TextareaState();
 			
 			if (!currState) {
@@ -646,6 +719,8 @@ Attacklab.wmdBase = function(){
 			if (callback) {
 				callback();
 			}
+			}
+			catch(e){}
 		};
 		
 		var handleCtrlYZ = function(event){
@@ -731,7 +806,7 @@ Attacklab.wmdBase = function(){
 				// keyCode 90: z
 				if ((event.ctrlKey || event.metaKey) && (event.keyCode == 89 || event.keyCode == 90)) {
 					event.preventDefault();
-				}
+				} else if (event.keyCode == 9) event.preventDefault();
 			});
 			
 			var handlePaste = function(){
@@ -773,12 +848,13 @@ Attacklab.wmdBase = function(){
 	};
 	
 	// I think my understanding of how the buttons and callbacks are stored in the array is incomplete.
-	wmd.editor = function(previewRefreshCallback){
+	wmd.editor = function(target, previewRefreshCallback){
 	
 		if (!previewRefreshCallback) {
 			previewRefreshCallback = function(){};
 		}
-		
+
+        wmd.panels.input = target;
 		var inputBox = wmd.panels.input;
 		
 		var offsetHeight = 0;
@@ -859,8 +935,8 @@ Attacklab.wmdBase = function(){
 			
 		var setUndoRedoButtonStates = function(){
 			if(undoMgr){
-				setupButton(document.getElementById("wmd-undo-button"), undoMgr.canUndo());
-				setupButton(document.getElementById("wmd-redo-button"), undoMgr.canRedo());
+				setupButton(jQuery(wmd.panels.buttonBar).find(".wmd-undo-button")[0], undoMgr.canUndo());
+                setupButton(jQuery(wmd.panels.buttonBar).find(".wmd-redo-button")[0], undoMgr.canRedo());
 			}
 		};
 		
@@ -907,46 +983,40 @@ Attacklab.wmdBase = function(){
 			}
 		}
 	
-		var makeSpritedButtonRow = function(){
+		var makeSpritedButtonRow = function(buttonBar){
 		 	
-			var buttonBar = document.getElementById("wmd-button-bar");
- 	
 			var normalYShift = "0px";
 			var disabledYShift = "-20px";
 			var highlightYShift = "-40px";
 			
 			var buttonRow = document.createElement("ul");
-			buttonRow.id = "wmd-button-row";
+			buttonRow.className = "wmd-button-row";
 			buttonRow = buttonBar.appendChild(buttonRow);
 
 			
 			var boldButton = document.createElement("li");
-			boldButton.className = "wmd-button";
-			boldButton.id = "wmd-bold-button";
-			boldButton.title = "Strong <strong> Ctrl+B";
+			boldButton.className = "wmd-button wmd-bold-button";
+			boldButton.title = "Negreta <strong> Ctrl+B";
 			boldButton.XShift = "0px";
 			boldButton.textOp = command.doBold;
 			setupButton(boldButton, true);
 			buttonRow.appendChild(boldButton);
 			
 			var italicButton = document.createElement("li");
-			italicButton.className = "wmd-button";
-			italicButton.id = "wmd-italic-button";
-			italicButton.title = "Emphasis <em> Ctrl+I";
+			italicButton.className = "wmd-button wmd-italic-button";
+			italicButton.title = "Emfasis <em> Ctrl+I";
 			italicButton.XShift = "-20px";
 			italicButton.textOp = command.doItalic;
 			setupButton(italicButton, true);
 			buttonRow.appendChild(italicButton);
-
+            /*
 			var spacer1 = document.createElement("li");
-			spacer1.className = "wmd-spacer";
-			spacer1.id = "wmd-spacer1";
+			spacer1.className = "wmd-spacer wmd-spacer1";
 			buttonRow.appendChild(spacer1); 
-
+            */
 			var linkButton = document.createElement("li");
-			linkButton.className = "wmd-button";
-			linkButton.id = "wmd-link-button";
-			linkButton.title = "Hyperlink <a> Ctrl+L";
+			linkButton.className = "wmd-button wmd-link-button";
+			linkButton.title = "Enllaç <a> Ctrl+L";
 			linkButton.XShift = "-40px";
 			linkButton.textOp = function(chunk, postProcessing, useDefaultText){
 				return command.doLinkOrImage(chunk, postProcessing, false);
@@ -955,43 +1025,38 @@ Attacklab.wmdBase = function(){
 			buttonRow.appendChild(linkButton);
 
 			var quoteButton = document.createElement("li");
-			quoteButton.className = "wmd-button";
-			quoteButton.id = "wmd-quote-button";
-			quoteButton.title = "Blockquote <blockquote> Ctrl+Q";
+			quoteButton.className = "wmd-button wmd-quote-button";
+			quoteButton.title = "Citació <blockquote> Ctrl+Q";
 			quoteButton.XShift = "-60px";
 			quoteButton.textOp = command.doBlockquote;
 			setupButton(quoteButton, true);
 			buttonRow.appendChild(quoteButton);
 			
 			var codeButton = document.createElement("li");
-			codeButton.className = "wmd-button";
-			codeButton.id = "wmd-code-button";
-			codeButton.title = "Code Sample <pre><code> Ctrl+K";
+			codeButton.className = "wmd-button wmd-code-button";
+			codeButton.title = "Codí font <pre><code> Ctrl+K";
 			codeButton.XShift = "-80px";
 			codeButton.textOp = command.doCode;
 			setupButton(codeButton, true);
 			buttonRow.appendChild(codeButton);
 
 			var imageButton = document.createElement("li");
-			imageButton.className = "wmd-button";
-			imageButton.id = "wmd-image-button";
-			imageButton.title = "Image <img> Ctrl+G";
+			imageButton.className = "wmd-button wmd-image-button";
+			imageButton.title = "Imatge <img> Ctrl+G";
 			imageButton.XShift = "-100px";
 			imageButton.textOp = function(chunk, postProcessing, useDefaultText){
 				return command.doLinkOrImage(chunk, postProcessing, true);
 			};
 			setupButton(imageButton, true);
 			buttonRow.appendChild(imageButton);
-
+            /*
 			var spacer2 = document.createElement("li");
-			spacer2.className = "wmd-spacer";
-			spacer2.id = "wmd-spacer2";
+			spacer2.className = "wmd-spacer wmd-spacer2";
 			buttonRow.appendChild(spacer2); 
-
+            */
 			var olistButton = document.createElement("li");
-			olistButton.className = "wmd-button";
-			olistButton.id = "wmd-olist-button";
-			olistButton.title = "Numbered List <ol> Ctrl+O";
+			olistButton.className = "wmd-button wmd-olist-button";
+			olistButton.title = "Llista numerada <ol> Ctrl+O";
 			olistButton.XShift = "-120px";
 			olistButton.textOp = function(chunk, postProcessing, useDefaultText){
 				command.doList(chunk, postProcessing, true, useDefaultText);
@@ -1000,9 +1065,8 @@ Attacklab.wmdBase = function(){
 			buttonRow.appendChild(olistButton);
 			
 			var ulistButton = document.createElement("li");
-			ulistButton.className = "wmd-button";
-			ulistButton.id = "wmd-ulist-button";
-			ulistButton.title = "Bulleted List <ul> Ctrl+U";
+			ulistButton.className = "wmd-button wmd-ulist-button";
+			ulistButton.title = "Llista normal <ul> Ctrl+U";
 			ulistButton.XShift = "-140px";
 			ulistButton.textOp = function(chunk, postProcessing, useDefaultText){
 				command.doList(chunk, postProcessing, false, useDefaultText);
@@ -1011,31 +1075,27 @@ Attacklab.wmdBase = function(){
 			buttonRow.appendChild(ulistButton);
 			
 			var headingButton = document.createElement("li");
-			headingButton.className = "wmd-button";
-			headingButton.id = "wmd-heading-button";
-			headingButton.title = "Heading <h1>/<h2> Ctrl+H";
+			headingButton.className = "wmd-button wmd-heading-button";
+			headingButton.title = "Títol <h1>/<h2> Ctrl+H";
 			headingButton.XShift = "-160px";
 			headingButton.textOp = command.doHeading;
 			setupButton(headingButton, true);
 			buttonRow.appendChild(headingButton); 
 			
 			var hrButton = document.createElement("li");
-			hrButton.className = "wmd-button";
-			hrButton.id = "wmd-hr-button";
-			hrButton.title = "Horizontal Rule <hr> Ctrl+R";
+			hrButton.className = "wmd-button wmd-hr-button";
+			hrButton.title = "Separació horizontal <hr> Ctrl+R";
 			hrButton.XShift = "-180px";
 			hrButton.textOp = command.doHorizontalRule;
 			setupButton(hrButton, true);
 			buttonRow.appendChild(hrButton); 
-			
+			/*
 			var spacer3 = document.createElement("li");
-			spacer3.className = "wmd-spacer";
-			spacer3.id = "wmd-spacer3";
+			spacer3.className = "wmd-spacer wmd-spacer3";
 			buttonRow.appendChild(spacer3); 
-			
+			*/
 			var undoButton = document.createElement("li");
-			undoButton.className = "wmd-button";
-			undoButton.id = "wmd-undo-button";
+			undoButton.className = "wmd-button wmd-undo-button";
 			undoButton.title = "Undo - Ctrl+Z";
 			undoButton.XShift = "-200px";
 			undoButton.execute = function(manager){
@@ -1045,8 +1105,7 @@ Attacklab.wmdBase = function(){
 			buttonRow.appendChild(undoButton); 
 			
 			var redoButton = document.createElement("li");
-			redoButton.className = "wmd-button";
-			redoButton.id = "wmd-redo-button";
+			redoButton.className = "wmd-button wmd-redo-button";
 			redoButton.title = "Redo - Ctrl+Y";
 			if (/win/.test(nav.platform.toLowerCase())) {
 				redoButton.title = "Redo - Ctrl+Y";
@@ -1061,10 +1120,42 @@ Attacklab.wmdBase = function(){
 			};
 			setupButton(redoButton, true);
 			buttonRow.appendChild(redoButton); 
+
+
+            /*mod: button test mod*/
+			var sChrBtn = document.createElement("li");
+			sChrBtn.className = "wmd-button wmd-schrbtn-button";
+			/*sChrBtn.id = "wmd-schrbtn-button";*/
+			sChrBtn.title = "Caracters especials Ctrl+W";
+			sChrBtn.XShift = "-260px";
+			//sChrBtn.textOp = command.doHeading;
+			
+			sChrBtn.textOp = function(chunk, postProcessing, useDefaultText){
+				return command.doSpecChars(chunk, postProcessing);
+			};
+			setupButton(sChrBtn, true);
+			buttonRow.appendChild(sChrBtn); 
+            /*mod: end*/
+
+            /*mod: button test mod*/
+			var sFileBtn = document.createElement("li");
+			sFileBtn.className = "wmd-button wmd-filemanager-button";
+			/*sFileBtn.id = "wmd-filemanager-button";*/
+			sFileBtn.title = "Enllaços interns";
+			sFileBtn.XShift = "-280px";
+			//sChrBtn.textOp = command.doHeading;
+			
+			sFileBtn.textOp = function(chunk, postProcessing, useDefaultText){
+				return command.doFileManager(chunk, postProcessing);
+			};
+			setupButton(sFileBtn, true);
+			buttonRow.appendChild(sFileBtn); 
+            /*mod: end*/
+
+
 			
 			var helpButton = document.createElement("li");
-			helpButton.className = "wmd-button";
-			helpButton.id = "wmd-help-button";
+			helpButton.className = "wmd-button wmd-help-button";
 			helpButton.XShift = "-240px";
 			helpButton.isHelp = true;
 			
@@ -1076,6 +1167,28 @@ Attacklab.wmdBase = function(){
 			
 			setupButton(helpButton, true);
 			buttonRow.appendChild(helpButton);
+
+
+            /*mod: button test mod*/
+            //add your own save routine here...
+            //I'm using a button object but you may hook up whatever you want
+            if (top.document.getElementById('btn' + global.edContext + 'save') != null)
+            {
+		        var sSaveBtn = document.createElement("li");
+		        sSaveBtn.className = "wmd-button wmd-save-button";
+        		
+		        sSaveBtn.title = "Guardar";
+		        
+		        sSaveBtn.XShift = "-300px";
+		        sSaveBtn.textOp = function(chunk, postProcessing, useDefaultText){
+		            top.document.getElementById('btn' + global.edContext + 'save').click();
+		            return false;
+		        };
+        		
+		        setupButton(sSaveBtn, true);
+		        buttonRow.appendChild(sSaveBtn); 
+		    }
+            /*mod: end*/
 			
 			setUndoRedoButtonStates();
 		}
@@ -1092,8 +1205,15 @@ Attacklab.wmdBase = function(){
 					setUndoRedoButtonStates();
 				});
 			}
-			
-			makeSpritedButtonRow();
+
+            
+            jQuery(wmd.panels.input).before("<div></div>");
+            wmd.panels.buttonBar = jQuery(wmd.panels.input).prev("div")[0];
+
+            jQuery(wmd.panels.buttonBar).addClass('wmd-button-bar');
+            jQuery(wmd.panels.input).addClass('wmd-input');
+
+            makeSpritedButtonRow(wmd.panels.buttonBar);
 			
 			
 			var keyEvent = "keydown";
@@ -1111,44 +1231,44 @@ Attacklab.wmdBase = function(){
 					
 					switch(keyCodeStr) {
 						case "b":
-							doClick(document.getElementById("wmd-bold-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-bold-button")[0]);
 							break;
 						case "i":
-							doClick(document.getElementById("wmd-italic-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-italic-button")[0]);
 							break;
 						case "l":
-							doClick(document.getElementById("wmd-link-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-link-button")[0]);
 							break;
 						case "q":
-							doClick(document.getElementById("wmd-quote-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-quote-button")[0]);
 							break;
 						case "k":
-							doClick(document.getElementById("wmd-code-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-code-button")[0]);
 							break;
 						case "g":
-							doClick(document.getElementById("wmd-image-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-image-button")[0]);
 							break;
 						case "o":
-							doClick(document.getElementById("wmd-olist-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-olist-button")[0]);
 							break;
 						case "u":
-							doClick(document.getElementById("wmd-ulist-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-ulist-button")[0]);
 							break;
 						case "h":
-							doClick(document.getElementById("wmd-heading-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-heading-button")[0]);
 							break;
 						case "r":
-							doClick(document.getElementById("wmd-hr-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-hr-button")[0]);
 							break;
 						case "y":
-							doClick(document.getElementById("wmd-redo-button"));
+							doClick(jQuery(wmd.panels.buttonBar).find(".wmd-redo-button")[0]);
 							break;
 						case "z":
 							if(key.shiftKey) {
-								doClick(document.getElementById("wmd-redo-button"));
+								doClick(jQuery(wmd.panels.buttonBar).find(".wmd-redo-button")[0]);
 							}
 							else {
-								doClick(document.getElementById("wmd-undo-button"));
+								doClick(jQuery(wmd.panels.buttonBar).find(".wmd-undo-button")[0]);
 							}
 							break;
 						default:
@@ -1168,6 +1288,7 @@ Attacklab.wmdBase = function(){
 			
 			// Auto-continue lists, code blocks and block quotes when
 			// the enter key is pressed.
+			/*
 			util.addEvent(inputBox, "keyup", function(key){
 				if (!key.shiftKey && !key.ctrlKey && !key.metaKey) {
 					var keyCode = key.charCode || key.keyCode;
@@ -1179,6 +1300,44 @@ Attacklab.wmdBase = function(){
 					}
 				}
 			});
+			*/
+			//returned to default behaviour of original wmd for lists
+			//Enter produces newline (br) in nearly every context. 
+			//That's what the user expects in most cases
+			//Shift+Enter is the only thing he needs to learn...
+			util.addEvent(inputBox, "keyup", function(key){
+				if (key.shiftKey && !key.ctrlKey && !key.metaKey) {
+					var keyCode = key.charCode || key.keyCode;
+					// Key code 13 is Enter
+					if (keyCode === 13) {
+						fakeButton = {};
+						fakeButton.textOp = command.doAutoindent;
+						doClick(fakeButton);
+					}
+					
+                    else if (keyCode === 9) {
+						fakeButton = {};
+						fakeButton.textOp = command.doUnTab;
+						doClick(fakeButton);
+					}
+
+				}
+			});
+
+			util.addEvent(inputBox, keyEvent, function(key){
+				if (!key.shiftKey && !key.ctrlKey && !key.metaKey) {
+					var keyCode = key.charCode || key.keyCode;
+					// Key code 13 is Enter
+					if (keyCode === 9) {
+						fakeButton = {};
+						fakeButton.textOp = command.doTab;
+						doClick(fakeButton);
+					}
+				}
+			});
+
+
+			
 			
 			// Disable ESC clearing the input textarea on IE
 			if (global.isIE) {
@@ -1204,22 +1363,32 @@ Attacklab.wmdBase = function(){
 		
 		// Convert the contents of the input textarea to HTML in the output/preview panels.
 		var convertToHtml = function(){
-		
-			if (wmd.showdown) {
-				var markdownConverter = new wmd.showdown.converter();
-			}
-			var text = inputBox.value;
-			
-			var callback = function(){
-				inputBox.value = text;
-			};
-			
-			if (!/markdown/.test(wmd.wmd_env.output.toLowerCase())) {
-				if (markdownConverter) {
-					inputBox.value = markdownConverter.makeHtml(text);
-					top.setTimeout(callback, 0);
-				}
-			}
+
+            if(wmd.wmd_env.convertInputBeforeSubmit) {
+                if (wmd.showdown) {
+                    var markdownConverter = new wmd.showdown.converter();
+                }
+                var text = inputBox.value;
+                //switch(
+                //that's what I needed
+                //if (doc.getElementById("atextarea") != null) doc.getElementById("atextarea").value = inputBox.value;            
+                
+                var callback = function(){
+                    inputBox.value = text;
+                };
+
+                if (!/markdown/.test(wmd.wmd_env.output.toLowerCase())) {
+                    if (markdownConverter) {
+                        inputBox.value = markdownConverter.makeHtml(text);
+                        top.setTimeout(callback, 0);
+                    }
+                }
+            }
+            else 
+            {    			
+                //that's what I needed
+                //if (doc.getElementById("atextarea") != null) doc.getElementById("atextarea").value = inputBox.value;            
+            }
 			return true;
 		};
 		
@@ -1267,17 +1436,23 @@ Attacklab.wmdBase = function(){
 		var inputArea = wmd.panels.input;
 		
 		this.init = function() {
-		
+
 			if (!util.isVisible(inputArea)) {
 				return;
 			}
-				
-			this.setInputAreaSelectionStartEnd();
-			this.scrollTop = inputArea.scrollTop;
-			if (!this.text && inputArea.selectionStart || inputArea.selectionStart === 0) {
-				this.text = inputArea.value;
+		    /*
+			if (!util.isVisible(inputArea)) {
+				return;
 			}
-			
+			*/	
+			try
+			{
+			    this.setInputAreaSelectionStartEnd();
+			    this.scrollTop = inputArea.scrollTop;
+			    if (!this.text && inputArea.selectionStart || inputArea.selectionStart === 0) {
+				    this.text = inputArea.value;
+			    }
+            } catch(e){};			
 		}
 		
 		// Sets the selected text in the input box after we've performed an
@@ -1313,52 +1488,57 @@ Attacklab.wmdBase = function(){
 		
 		this.setInputAreaSelectionStartEnd = function(){
 		
-			if (inputArea.selectionStart || inputArea.selectionStart === 0) {
-			
-				stateObj.start = inputArea.selectionStart;
-				stateObj.end = inputArea.selectionEnd;
-			}
-			else if (doc.selection) {
-				
-				stateObj.text = util.fixEolChars(inputArea.value);
-				
-				// IE loses the selection in the textarea when buttons are
-				// clicked.  On IE we cache the selection and set a flag
-				// which we check for here.
-				var range;
-				if(wmd.ieRetardedClick && wmd.ieCachedRange) {
-					range = wmd.ieCachedRange;
-					wmd.ieRetardedClick = false;
-				}
-				else {
-					range = doc.selection.createRange();
-				}
+		    try
+		    {
+		
+			    if (inputArea.selectionStart || inputArea.selectionStart === 0) {
+    			
+				    stateObj.start = inputArea.selectionStart;
+				    stateObj.end = inputArea.selectionEnd;
+			    }
+			    else if (doc.selection) {
+    				
+				    stateObj.text = util.fixEolChars(inputArea.value);
+    				
+				    // IE loses the selection in the textarea when buttons are
+				    // clicked.  On IE we cache the selection and set a flag
+				    // which we check for here.
+				    var range;
+				    if(wmd.ieRetardedClick && wmd.ieCachedRange) {
+					    range = wmd.ieCachedRange;
+					    wmd.ieRetardedClick = false;
+				    }
+				    else {
+					    range = doc.selection.createRange();
+				    }
 
-				var fixedRange = util.fixEolChars(range.text);
-				var marker = "\x07";
-				var markedRange = marker + fixedRange + marker;
-				range.text = markedRange;
-				var inputText = util.fixEolChars(inputArea.value);
-					
-				range.moveStart("character", -markedRange.length);
-				range.text = fixedRange;
+				    var fixedRange = util.fixEolChars(range.text);
+				    var marker = "\x07";
+				    var markedRange = marker + fixedRange + marker;
+				    range.text = markedRange;
+				    var inputText = util.fixEolChars(inputArea.value);
+    					
+				    range.moveStart("character", -markedRange.length);
+				    range.text = fixedRange;
 
-				stateObj.start = inputText.indexOf(marker);
-				stateObj.end = inputText.lastIndexOf(marker) - marker.length;
-					
-				var len = stateObj.text.length - util.fixEolChars(inputArea.value).length;
-					
-				if (len) {
-					range.moveStart("character", -fixedRange.length);
-					while (len--) {
-						fixedRange += "\n";
-						stateObj.end += 1;
-					}
-					range.text = fixedRange;
-				}
-					
-				this.setInputAreaSelection();
-			}
+				    stateObj.start = inputText.indexOf(marker);
+				    stateObj.end = inputText.lastIndexOf(marker) - marker.length;
+    					
+				    var len = stateObj.text.length - util.fixEolChars(inputArea.value).length;
+    					
+				    if (len) {
+					    range.moveStart("character", -fixedRange.length);
+					    while (len--) {
+						    fixedRange += "\n";
+						    stateObj.end += 1;
+					    }
+					    range.text = fixedRange;
+				    }
+    					
+				    this.setInputAreaSelection();
+			    }
+	        }
+	        catch(e){}
 		};
 		
 		// Restore this state into the input area.
@@ -1507,873 +1687,1087 @@ Attacklab.wmdBase = function(){
 		this.endTag = this.endTag.replace(/(\n*$)/, "");
 		this.after = this.after + (match ? match[1] : "");
 
-		if (this.before) {
-		
-			regexText = replacementText = "";
-			
-			while (nLinesBefore--) {
-				regexText += "\\n?";
-				replacementText += "\n";
-			}
-			
-			if (findExtraNewlines) {
-				regexText = "\\n*";
-			}
-			this.before = this.before.replace(new re(regexText + "$", ""), replacementText);
-		}
-		
-		if (this.after) {
-		
-			regexText = replacementText = "";
-			
-			while (nLinesAfter--) {
-				regexText += "\\n?";
-				replacementText += "\n";
-			}
-			if (findExtraNewlines) {
-				regexText = "\\n*";
-			}
-			
-			this.after = this.after.replace(new re(regexText, ""), replacementText);
-		}
-	};
-	
-	// The markdown symbols - 4 spaces = code, > = blockquote, etc.
-	command.prefixes = "(?:\\s{4,}|\\s*>|\\s*-\\s+|\\s*\\d+\\.|=|\\+|-|_|\\*|#|\\s*\\[[^\n]]+\\]:)";
-	
-	// Remove markdown symbols from the chunk selection.
-	command.unwrap = function(chunk){
-		var txt = new re("([^\\n])\\n(?!(\\n|" + command.prefixes + "))", "g");
-		chunk.selection = chunk.selection.replace(txt, "$1 $2");
-	};
-	
-	command.wrap = function(chunk, len){
-		command.unwrap(chunk);
-		var regex = new re("(.{1," + len + "})( +|$\\n?)", "gm");
-		
-		chunk.selection = chunk.selection.replace(regex, function(line, marked){
-			if (new re("^" + command.prefixes, "").test(line)) {
-				return line;
-			}
-			return marked + "\n";
-		});
-		
-		chunk.selection = chunk.selection.replace(/\s+$/, "");
-	};
-	
-	command.doBold = function(chunk, postProcessing, useDefaultText){
-		return command.doBorI(chunk, 2, "strong text");
-	};
-	
-	command.doItalic = function(chunk, postProcessing, useDefaultText){
-		return command.doBorI(chunk, 1, "emphasized text");
-	};
-	
-	// chunk: The selected region that will be enclosed with */**
-	// nStars: 1 for italics, 2 for bold
-	// insertText: If you just click the button without highlighting text, this gets inserted
-	command.doBorI = function(chunk, nStars, insertText){
-	
-		// Get rid of whitespace and fixup newlines.
-		chunk.trimWhitespace();
-		chunk.selection = chunk.selection.replace(/\n{2,}/g, "\n");
-		
-		// Look for stars before and after.  Is the chunk already marked up?
-		chunk.before.search(/(\**$)/);
-		var starsBefore = re.$1;
-		
-		chunk.after.search(/(^\**)/);
-		var starsAfter = re.$1;
-		
-		var prevStars = Math.min(starsBefore.length, starsAfter.length);
-		
-		// Remove stars if we have to since the button acts as a toggle.
-		if ((prevStars >= nStars) && (prevStars != 2 || nStars != 1)) {
-			chunk.before = chunk.before.replace(re("[*]{" + nStars + "}$", ""), "");
-			chunk.after = chunk.after.replace(re("^[*]{" + nStars + "}", ""), "");
-		}
-		else if (!chunk.selection && starsAfter) {
-			// It's not really clear why this code is necessary.  It just moves
-			// some arbitrary stuff around.
-			chunk.after = chunk.after.replace(/^([*_]*)/, "");
-			chunk.before = chunk.before.replace(/(\s?)$/, "");
-			var whitespace = re.$1;
-			chunk.before = chunk.before + starsAfter + whitespace;
-		}
-		else {
-		
-			// In most cases, if you don't have any selected text and click the button
-			// you'll get a selected, marked up region with the default text inserted.
-			if (!chunk.selection && !starsAfter) {
-				chunk.selection = insertText;
-			}
-			
-			// Add the true markup.
-			var markup = nStars <= 1 ? "*" : "**"; // shouldn't the test be = ?
-			chunk.before = chunk.before + markup;
-			chunk.after = markup + chunk.after;
-		}
-		
-		return;
-	};
-	
-	command.stripLinkDefs = function(text, defsToAdd){
-	
-		text = text.replace(/^[ ]{0,3}\[(\d+)\]:[ \t]*\n?[ \t]*<?(\S+?)>?[ \t]*\n?[ \t]*(?:(\n*)["(](.+?)[")][ \t]*)?(?:\n+|$)/gm, 
-			function(totalMatch, id, link, newlines, title){	
-				defsToAdd[id] = totalMatch.replace(/\s*$/, "");
-				if (newlines) {
-					// Strip the title and return that separately.
-					defsToAdd[id] = totalMatch.replace(/["(](.+?)[")]$/, "");
-					return newlines + title;
-				}
-				return "";
-			});
-		
-		return text;
-	};
-	
-	command.addLinkDef = function(chunk, linkDef){
-	
-		var refNumber = 0; // The current reference number
-		var defsToAdd = {}; //
-		// Start with a clean slate by removing all previous link definitions.
-		chunk.before = command.stripLinkDefs(chunk.before, defsToAdd);
-		chunk.selection = command.stripLinkDefs(chunk.selection, defsToAdd);
-		chunk.after = command.stripLinkDefs(chunk.after, defsToAdd);
-		
-		var defs = "";
-		var regex = /(\[(?:\[[^\]]*\]|[^\[\]])*\][ ]?(?:\n[ ]*)?\[)(\d+)(\])/g;
-		
-		var addDefNumber = function(def){
-			refNumber++;
-			def = def.replace(/^[ ]{0,3}\[(\d+)\]:/, "  [" + refNumber + "]:");
-			defs += "\n" + def;
-		};
-		
-		var getLink = function(wholeMatch, link, id, end){
-		
-			if (defsToAdd[id]) {
-				addDefNumber(defsToAdd[id]);
-				return link + refNumber + end;
-				
-			}
-			return wholeMatch;
-		};
-		
-		chunk.before = chunk.before.replace(regex, getLink);
-		
-		if (linkDef) {
-			addDefNumber(linkDef);
-		}
-		else {
-			chunk.selection = chunk.selection.replace(regex, getLink);
-		}
-		
-		var refOut = refNumber;
-		
-		chunk.after = chunk.after.replace(regex, getLink);
-		
-		if (chunk.after) {
-			chunk.after = chunk.after.replace(/\n*$/, "");
-		}
-		if (!chunk.after) {
-			chunk.selection = chunk.selection.replace(/\n*$/, "");
-		}
-		
-		chunk.after += "\n\n" + defs;
-		
-		return refOut;
-	};
-	
-	command.doLinkOrImage = function(chunk, postProcessing, isImage){
-	
-		chunk.trimWhitespace();
-		chunk.findTags(/\s*!?\[/, /\][ ]?(?:\n[ ]*)?(\[.*?\])?/);
-		
-		if (chunk.endTag.length > 1) {
-		
-			chunk.startTag = chunk.startTag.replace(/!?\[/, "");
-			chunk.endTag = "";
-			command.addLinkDef(chunk, null);
-			
-		}
-		else {
-		
-			if (/\n\n/.test(chunk.selection)) {
-				command.addLinkDef(chunk, null);
-				return;
-			}
-			
-			// The function to be executed when you enter a link and press OK or Cancel.
-			// Marks up the link and adds the ref.
-			var makeLinkMarkdown = function(link){
-			
-				if (link !== null) {
-				
-					chunk.startTag = chunk.endTag = "";
-					var linkDef = " [999]: " + link;
-					
-					var num = command.addLinkDef(chunk, linkDef);
-					chunk.startTag = isImage ? "![" : "[";
-					chunk.endTag = "][" + num + "]";
-					
-					if (!chunk.selection) {
-						if (isImage) {
-							chunk.selection = "alt text";
-						}
-						else {
-							chunk.selection = "link text";
-						}
+				if (this.before) {
+
+					regexText = replacementText = "";
+
+					while (nLinesBefore--) {
+						regexText += "\\n?";
+						replacementText += "\n";
 					}
+
+					if (findExtraNewlines) {
+						regexText = "\\n*";
+					}
+					this.before = this.before.replace(new re(regexText + "$", ""), replacementText);
 				}
-				postProcessing();
+
+				if (this.after) {
+
+					regexText = replacementText = "";
+
+					while (nLinesAfter--) {
+						regexText += "\\n?";
+						replacementText += "\n";
+					}
+					if (findExtraNewlines) {
+						regexText = "\\n*";
+					}
+
+					this.after = this.after.replace(new re(regexText, ""), replacementText);
+				}
 			};
-			
-			if (isImage) {
-				util.prompt(imageDialogText, imageDefaultText, makeLinkMarkdown);
-			}
-			else {
-				util.prompt(linkDialogText, linkDefaultText, makeLinkMarkdown);
-			}
-			return true;
-		}
-	};
-	
-	util.makeAPI = function(){
-		wmd.wmd = {};
-		wmd.wmd.editor = wmd.editor;
-		wmd.wmd.previewManager = wmd.previewManager;
-	};
-	
-	util.startEditor = function(){
-	
-		if (wmd.wmd_env.autostart === false) {
-			util.makeAPI();
-			return;
-		}
 
-		var edit;		// The editor (buttons + input + outputs) - the main object.
-		var previewMgr;	// The preview manager.
-		
-		// Fired after the page has fully loaded.
-		var loadListener = function(){
-		
-			wmd.panels = new wmd.PanelCollection();
-			
-			previewMgr = new wmd.previewManager();
-			var previewRefreshCallback = previewMgr.refresh;
-						
-			edit = new wmd.editor(previewRefreshCallback);
-			
-			previewMgr.refresh(true);
-			
-		};
-		
-		util.addEvent(top, "load", loadListener);
-	};
-	
-	wmd.previewManager = function(){
-		
-		var managerObj = this;
-		var converter;
-		var poller;
-		var timeout;
-		var elapsedTime;
-		var oldInputText;
-		var htmlOut;
-		var maxDelay = 3000;
-		var startType = "delayed"; // The other legal value is "manual"
-		
-		// Adds event listeners to elements and creates the input poller.
-		var setupEvents = function(inputElem, listener){
-		
-			util.addEvent(inputElem, "input", listener);
-			inputElem.onpaste = listener;
-			inputElem.ondrop = listener;
-			
-			util.addEvent(inputElem, "keypress", listener);
-			util.addEvent(inputElem, "keydown", listener);
-			// previewPollInterval is set at the top of this file.
-			poller = new wmd.inputPoller(listener, previewPollInterval);
-		};
-		
-		var getDocScrollTop = function(){
-		
-			var result = 0;
-			
-			if (top.innerHeight) {
-				result = top.pageYOffset;
-			}
-			else 
-				if (doc.documentElement && doc.documentElement.scrollTop) {
-					result = doc.documentElement.scrollTop;
-				}
-				else 
-					if (doc.body) {
-						result = doc.body.scrollTop;
+			// The markdown symbols - 4 spaces = code, > = blockquote, etc.
+			command.prefixes = "(?:\\s{4,}|\\s*>|\\s*-\\s+|\\s*\\d+\\.|=|\\+|-|_|\\*|#|\\s*\\[[^\n]]+\\]:)";
+
+			// Remove markdown symbols from the chunk selection.
+			command.unwrap = function(chunk){
+				var txt = new re("([^\\n])\\n(?!(\\n|" + command.prefixes + "))", "g");
+				chunk.selection = chunk.selection.replace(txt, "$1 $2");
+			};
+
+			command.wrap = function(chunk, len){
+				command.unwrap(chunk);
+				var regex = new re("(.{1," + len + "})( +|$\\n?)", "gm");
+
+				chunk.selection = chunk.selection.replace(regex, function(line, marked){
+					if (new re("^" + command.prefixes, "").test(line)) {
+						return line;
 					}
-			
-			return result;
-		};
-		
-		var makePreviewHtml = function(){
-		
-			// If there are no registered preview and output panels
-			// there is nothing to do.
-			if (!wmd.panels.preview && !wmd.panels.output) {
-				return;
-			}
-			
-			var text = wmd.panels.input.value;
-			if (text && text == oldInputText) {
-				return; // Input text hasn't changed.
-			}
-			else {
-				oldInputText = text;
-			}
-			
-			var prevTime = new Date().getTime();
-			
-			if (!converter && wmd.showdown) {
-				converter = new wmd.showdown.converter();
-			}
-			
-			if (converter) {
-				text = converter.makeHtml(text);
-			}
-			
-			// Calculate the processing time of the HTML creation.
-			// It's used as the delay time in the event listener.
-			var currTime = new Date().getTime();
-			elapsedTime = currTime - prevTime;
-			
-			pushPreviewHtml(text);
-			htmlOut = text;
-		};
-		
-		// setTimeout is already used.  Used as an event listener.
-		var applyTimeout = function(){
-		
-			if (timeout) {
-				top.clearTimeout(timeout);
-				timeout = undefined;
-			}
-			
-			if (startType !== "manual") {
-			
-				var delay = 0;
-				
-				if (startType === "delayed") {
-					delay = elapsedTime;
-				}
-				
-				if (delay > maxDelay) {
-					delay = maxDelay;
-				}
-				timeout = top.setTimeout(makePreviewHtml, delay);
-			}
-		};
-		
-		var getScaleFactor = function(panel){
-			if (panel.scrollHeight <= panel.clientHeight) {
-				return 1;
-			}
-			return panel.scrollTop / (panel.scrollHeight - panel.clientHeight);
-		};
-		
-		var setPanelScrollTops = function(){
-		
-			if (wmd.panels.preview) {
-				wmd.panels.preview.scrollTop = (wmd.panels.preview.scrollHeight - wmd.panels.preview.clientHeight) * getScaleFactor(wmd.panels.preview);
-				;
-			}
-			
-			if (wmd.panels.output) {
-				wmd.panels.output.scrollTop = (wmd.panels.output.scrollHeight - wmd.panels.output.clientHeight) * getScaleFactor(wmd.panels.output);
-				;
-			}
-		};
-		
-		this.refresh = function(requiresRefresh){
-		
-			if (requiresRefresh) {
-				oldInputText = "";
-				makePreviewHtml();
-			}
-			else {
-				applyTimeout();
-			}
-		};
-		
-		this.processingTime = function(){
-			return elapsedTime;
-		};
-		
-		// The output HTML
-		this.output = function(){
-			return htmlOut;
-		};
-		
-		// The mode can be "manual" or "delayed"
-		this.setUpdateMode = function(mode){
-			startType = mode;
-			managerObj.refresh();
-		};
-		
-		var isFirstTimeFilled = true;
-		
-		var pushPreviewHtml = function(text){
-		
-			var emptyTop = position.getTop(wmd.panels.input) - getDocScrollTop();
-			
-			// Send the encoded HTML to the output textarea/div.
-			if (wmd.panels.output) {
-				// The value property is only defined if the output is a textarea.
-				if (wmd.panels.output.value !== undefined) {
-					wmd.panels.output.value = text;
-					wmd.panels.output.readOnly = true;
-				}
-				// Otherwise we are just replacing the text in a div.
-				// Send the HTML wrapped in <pre><code>
-				else {
-					var newText = text.replace(/&/g, "&amp;");
-					newText = newText.replace(/</g, "&lt;");
-					wmd.panels.output.innerHTML = "<pre><code>" + newText + "</code></pre>";
-				}
-			}
-			
-			if (wmd.panels.preview) {
-				wmd.panels.preview.innerHTML = text;
-			}
-			
-			setPanelScrollTops();
-			
-			if (isFirstTimeFilled) {
-				isFirstTimeFilled = false;
-				return;
-			}
-			
-			var fullTop = position.getTop(wmd.panels.input) - getDocScrollTop();
-			
-			if (global.isIE) {
-				top.setTimeout(function(){
-					top.scrollBy(0, fullTop - emptyTop);
-				}, 0);
-			}
-			else {
-				top.scrollBy(0, fullTop - emptyTop);
-			}
-		};
-		
-		var init = function(){
-		
-			setupEvents(wmd.panels.input, applyTimeout);
-			makePreviewHtml();
-			
-			if (wmd.panels.preview) {
-				wmd.panels.preview.scrollTop = 0;
-			}
-			if (wmd.panels.output) {
-				wmd.panels.output.scrollTop = 0;
-			}
-		};
-		
-		this.destroy = function(){
-			if (poller) {
-				poller.destroy();
-			}
-		};
-		
-		init();
-	};
-
-	// Moves the cursor to the next line and continues lists, quotes and code.
-	command.doAutoindent = function(chunk, postProcessing, useDefaultText){
-		
-		chunk.before = chunk.before.replace(/(\n|^)[ ]{0,3}([*+-]|\d+[.])[ \t]*\n$/, "\n\n");
-		chunk.before = chunk.before.replace(/(\n|^)[ ]{0,3}>[ \t]*\n$/, "\n\n");
-		chunk.before = chunk.before.replace(/(\n|^)[ \t]+\n$/, "\n\n");
-		
-		useDefaultText = false;
-		
-		if(/(\n|^)[ ]{0,3}([*+-])[ \t]+.*\n$/.test(chunk.before)){
-			if(command.doList){
-				command.doList(chunk, postProcessing, false, true);
-			}
-		}
-		if(/(\n|^)[ ]{0,3}(\d+[.])[ \t]+.*\n$/.test(chunk.before)){
-			if(command.doList){
-				command.doList(chunk, postProcessing, true, true);
-			}
-		}
-		if(/(\n|^)[ ]{0,3}>[ \t]+.*\n$/.test(chunk.before)){
-			if(command.doBlockquote){
-				command.doBlockquote(chunk, postProcessing, useDefaultText);
-			}
-		}
-		if(/(\n|^)(\t|[ ]{4,}).*\n$/.test(chunk.before)){
-			if(command.doCode){
-				command.doCode(chunk, postProcessing, useDefaultText);
-			}
-		}
-	};
-	
-	command.doBlockquote = function(chunk, postProcessing, useDefaultText){
-		
-		chunk.selection = chunk.selection.replace(/^(\n*)([^\r]+?)(\n*)$/,
-			function(totalMatch, newlinesBefore, text, newlinesAfter){
-				chunk.before += newlinesBefore;
-				chunk.after = newlinesAfter + chunk.after;
-				return text;
-			});
-			
-		chunk.before = chunk.before.replace(/(>[ \t]*)$/,
-			function(totalMatch, blankLine){
-				chunk.selection = blankLine + chunk.selection;
-				return "";
-			});
-		
-		var defaultText = useDefaultText ? "Blockquote" : "";
-		chunk.selection = chunk.selection.replace(/^(\s|>)+$/ ,"");
-		chunk.selection = chunk.selection || defaultText;
-		
-		if(chunk.before){
-			chunk.before = chunk.before.replace(/\n?$/,"\n");
-		}
-		if(chunk.after){
-			chunk.after = chunk.after.replace(/^\n?/,"\n");
-		}
-		
-		chunk.before = chunk.before.replace(/(((\n|^)(\n[ \t]*)*>(.+\n)*.*)+(\n[ \t]*)*$)/,
-			function(totalMatch){
-				chunk.startTag = totalMatch;
-				return "";
-			});
-			
-		chunk.after = chunk.after.replace(/^(((\n|^)(\n[ \t]*)*>(.+\n)*.*)+(\n[ \t]*)*)/,
-			function(totalMatch){
-				chunk.endTag = totalMatch;
-				return "";
-			});
-		
-		var replaceBlanksInTags = function(useBracket){
-			
-			var replacement = useBracket ? "> " : "";
-			
-			if(chunk.startTag){
-				chunk.startTag = chunk.startTag.replace(/\n((>|\s)*)\n$/,
-					function(totalMatch, markdown){
-						return "\n" + markdown.replace(/^[ ]{0,3}>?[ \t]*$/gm, replacement) + "\n";
-					});
-			}
-			if(chunk.endTag){
-				chunk.endTag = chunk.endTag.replace(/^\n((>|\s)*)\n/,
-					function(totalMatch, markdown){
-						return "\n" + markdown.replace(/^[ ]{0,3}>?[ \t]*$/gm, replacement) + "\n";
-					});
-			}
-		};
-		
-		if(/^(?![ ]{0,3}>)/m.test(chunk.selection)){
-			command.wrap(chunk, wmd.wmd_env.lineLength - 2);
-			chunk.selection = chunk.selection.replace(/^/gm, "> ");
-			replaceBlanksInTags(true);
-			chunk.addBlankLines();
-		}
-		else{
-			chunk.selection = chunk.selection.replace(/^[ ]{0,3}> ?/gm, "");
-			command.unwrap(chunk);
-			replaceBlanksInTags(false);
-			
-			if(!/^(\n|^)[ ]{0,3}>/.test(chunk.selection) && chunk.startTag){
-				chunk.startTag = chunk.startTag.replace(/\n{0,2}$/, "\n\n");
-			}
-			
-			if(!/(\n|^)[ ]{0,3}>.*$/.test(chunk.selection) && chunk.endTag){
-				chunk.endTag=chunk.endTag.replace(/^\n{0,2}/, "\n\n");
-			}
-		}
-		
-		if(!/\n/.test(chunk.selection)){
-			chunk.selection = chunk.selection.replace(/^(> *)/,
-			function(wholeMatch, blanks){
-				chunk.startTag += blanks;
-				return "";
-			});
-		}
-	};
-
-	command.doCode = function(chunk, postProcessing, useDefaultText){
-		
-		var hasTextBefore = /\S[ ]*$/.test(chunk.before);
-		var hasTextAfter = /^[ ]*\S/.test(chunk.after);
-		
-		// Use 'four space' markdown if the selection is on its own
-		// line or is multiline.
-		if((!hasTextAfter && !hasTextBefore) || /\n/.test(chunk.selection)){
-			
-			chunk.before = chunk.before.replace(/[ ]{4}$/,
-				function(totalMatch){
-					chunk.selection = totalMatch + chunk.selection;
-					return "";
+					return marked + "\n";
 				});
-				
-			var nLinesBefore = 1;
-			var nLinesAfter = 1;
-			
-			
-			if(/\n(\t|[ ]{4,}).*\n$/.test(chunk.before) || chunk.after === ""){
-				nLinesBefore = 0; 
-			}
-			if(/^\n(\t|[ ]{4,})/.test(chunk.after)){
-				nLinesAfter = 0; // This needs to happen on line 1
-			}
-			
-			chunk.addBlankLines(nLinesBefore, nLinesAfter);
-			
-			if(!chunk.selection){
-				chunk.startTag = "    ";
-				chunk.selection = useDefaultText ? "enter code here" : "";
-			}
-			else {
-				if(/^[ ]{0,3}\S/m.test(chunk.selection)){
-					chunk.selection = chunk.selection.replace(/^/gm, "    ");
+
+				chunk.selection = chunk.selection.replace(/\s+$/, "");
+			};
+
+			command.doBold = function(chunk, postProcessing, useDefaultText){
+				return command.doBorI(chunk, 2, "strong text");
+			};
+
+			command.doItalic = function(chunk, postProcessing, useDefaultText){
+				return command.doBorI(chunk, 1, "emphasized text");
+			};
+
+			// chunk: The selected region that will be enclosed with */**
+			// nStars: 1 for italics, 2 for bold
+			// insertText: If you just click the button without highlighting text, this gets inserted
+			command.doBorI = function(chunk, nStars, insertText){
+
+				// Get rid of whitespace and fixup newlines.
+				chunk.trimWhitespace();
+				chunk.selection = chunk.selection.replace(/\n{2,}/g, "\n");
+
+				// Look for stars before and after.  Is the chunk already marked up?
+				chunk.before.search(/(\**$)/);
+				var starsBefore = re.$1;
+
+				chunk.after.search(/(^\**)/);
+				var starsAfter = re.$1;
+
+				var prevStars = Math.min(starsBefore.length, starsAfter.length);
+
+				// Remove stars if we have to since the button acts as a toggle.
+				if ((prevStars >= nStars) && (prevStars != 2 || nStars != 1)) {
+					chunk.before = chunk.before.replace(re("[*]{" + nStars + "}$", ""), "");
+					chunk.after = chunk.after.replace(re("^[*]{" + nStars + "}", ""), "");
+				}
+				else if (!chunk.selection && starsAfter) {
+					// It's not really clear why this code is necessary.  It just moves
+					// some arbitrary stuff around.
+					chunk.after = chunk.after.replace(/^([*_]*)/, "");
+					chunk.before = chunk.before.replace(/(\s?)$/, "");
+					var whitespace = re.$1;
+					chunk.before = chunk.before + starsAfter + whitespace;
+				}
+				else {
+
+					// In most cases, if you don't have any selected text and click the button
+					// you'll get a selected, marked up region with the default text inserted.
+					if (!chunk.selection && !starsAfter) {
+						chunk.selection = insertText;
+					}
+
+					// Add the true markup.
+					var markup = nStars <= 1 ? "*" : "**"; // shouldn't the test be = ?
+					chunk.before = chunk.before + markup;
+					chunk.after = markup + chunk.after;
+				}
+
+				return;
+			};
+
+			command.stripLinkDefs = function(text, defsToAdd){
+
+				text = text.replace(/^[ ]{0,3}\[(\d+)\]:[ \t]*\n?[ \t]*<?(\S+?)>?[ \t]*\n?[ \t]*(?:(\n*)["(](.+?)[")][ \t]*)?(?:\n+|$)/gm, 
+					function(totalMatch, id, link, newlines, title){	
+						defsToAdd[id] = totalMatch.replace(/\s*$/, "");
+						if (newlines) {
+							// Strip the title and return that separately.
+							defsToAdd[id] = totalMatch.replace(/["(](.+?)[")]$/, "");
+							return newlines + title;
+						}
+						return "";
+					});
+
+				return text;
+			};
+
+			command.addLinkDef = function(chunk, linkDef){
+
+				var refNumber = 0; // The current reference number
+				var defsToAdd = {}; //
+				// Start with a clean slate by removing all previous link definitions.
+				chunk.before = command.stripLinkDefs(chunk.before, defsToAdd);
+				chunk.selection = command.stripLinkDefs(chunk.selection, defsToAdd);
+				chunk.after = command.stripLinkDefs(chunk.after, defsToAdd);
+
+				var defs = "";
+				var regex = /(\[(?:\[[^\]]*\]|[^\[\]])*\][ ]?(?:\n[ ]*)?\[)(\d+)(\])/g;
+
+				var addDefNumber = function(def){
+					refNumber++;
+					def = def.replace(/^[ ]{0,3}\[(\d+)\]:/, "  [" + refNumber + "]:");
+					defs += "\n" + def;
+				};
+
+				var getLink = function(wholeMatch, link, id, end){
+
+					if (defsToAdd[id]) {
+						addDefNumber(defsToAdd[id]);
+						return link + refNumber + end;
+
+					}
+					return wholeMatch;
+				};
+
+				chunk.before = chunk.before.replace(regex, getLink);
+
+				if (linkDef) {
+					addDefNumber(linkDef);
+				}
+				else {
+					chunk.selection = chunk.selection.replace(regex, getLink);
+				}
+
+				var refOut = refNumber;
+
+				chunk.after = chunk.after.replace(regex, getLink);
+
+				if (chunk.after) {
+					chunk.after = chunk.after.replace(/\n*$/, "");
+				}
+				if (!chunk.after) {
+					chunk.selection = chunk.selection.replace(/\n*$/, "");
+				}
+
+				chunk.after += "\n\n" + defs;
+
+				return refOut;
+			};
+
+			command.doLinkOrImage = function(chunk, postProcessing, isImage){
+
+				chunk.trimWhitespace();
+				chunk.findTags(/\s*!?\[/, /\][ ]?(?:\n[ ]*)?(\[.*?\])?/);
+
+				if (chunk.endTag.length > 1) {
+
+					chunk.startTag = chunk.startTag.replace(/!?\[/, "");
+					chunk.endTag = "";
+					command.addLinkDef(chunk, null);
+
+				}
+				else {
+
+					if (/\n\n/.test(chunk.selection)) {
+						command.addLinkDef(chunk, null);
+						return;
+					}
+
+					// The function to be executed when you enter a link and press OK or Cancel.
+					// Marks up the link and adds the ref.
+					var makeLinkMarkdown = function(link){
+
+						if (link !== null && link !== "http://" && link !== "https://" && link !== "ftp://" && link !== "mailto:") {
+
+							chunk.startTag = chunk.endTag = "";
+							var linkDef = " [999]: " + link;
+
+							var num = command.addLinkDef(chunk, linkDef);
+							chunk.startTag = isImage ? "![" : "[";
+							chunk.endTag = "][" + num + "]";
+
+							if (!chunk.selection) {
+								if (isImage) {
+									chunk.selection = "text alternatiu";
+								}
+								else {
+									chunk.selection = "text enllaç";
+								}
+							}
+						}
+						else if (link !== null) alert("Falta un enllaç vàlid");
+						postProcessing();
+					};
+
+					if (isImage) {
+						util.prompt(imageDialogText, imageDefaultText, makeLinkMarkdown);
+					}
+					else {
+						util.prompt(linkDialogText, linkDefaultText, makeLinkMarkdown);
+					}
+					return true;
+				}
+			};
+
+
+			command.doFileManager = function(chunk, postProcessing){
+
+				chunk.trimWhitespace();
+				chunk.findTags(/\s*!?\[/, /\][ ]?(?:\n[ ]*)?(\[.*?\])?/);
+
+				if (chunk.endTag.length > 1) {
+
+					chunk.startTag = chunk.startTag.replace(/!?\[/, "");
+					chunk.endTag = "";
+					command.addLinkDef(chunk, null);
+
+				}
+				else {
+
+					if (/\n\n/.test(chunk.selection)) {
+						command.addLinkDef(chunk, null);
+						return;
+					}
+
+					// The function to be executed when you enter a link and press OK or Cancel.
+					// Marks up the link and adds the ref.
+					var makeLinkMarkdown = function(link, isImage){
+
+						if (link !== null) {
+
+							chunk.startTag = chunk.endTag = "";
+							var linkDef = " [999]: " + link;
+
+							var num = command.addLinkDef(chunk, linkDef);
+							chunk.startTag = isImage ? "![" : "[";
+							chunk.endTag = "][" + num + "]";
+
+							if (!chunk.selection) {
+								if (isImage) {
+									chunk.selection = "text alternatiu";
+								}
+								else {
+									chunk.selection = "text enllaç";
+								}
+							}
+						}
+						postProcessing();
+					};
+
+			        chunk.findTags(/\n(.*?)<([^>]*)/, /([^<]*)>(.*?)\n$/);
+		            //alert(chunk.startTag + " : " + chunk.startTag.length + "\n" + chunk.endTag + " : " + chunk.endTag.length);	
+
+		            if ((chunk.startTag === chunk.endTag && chunk.endTag == ""))
+		            {
+		                util.filemanager(makeLinkMarkdown);
+			    	    return true;
+		            }
+				    else
+				    {
+		                alert("Possible conflicte per estar adins de tags html...");		    
+		                return false;
+			        }
+
+
+					/*
+					if (isImage) {
+						util.prompt(imageDialogText, imageDefaultText, makeLinkMarkdown);
+					}
+					else {
+						util.prompt(linkDialogText, linkDefaultText, makeLinkMarkdown);
+					}
+					*/
+					//return true;
+				}
+
+
+			};
+
+
+		    command.doSpecChars = function(chunk, postProcessing) {
+
+				var insSpecChr = function(specialChar){
+
+		            if (specialChar !== null) {
+		                    chunk.selection = specialChar;
+		                    postProcessing();
+					}
+				};
+		        chunk.trimWhitespace();
+			    chunk.findTags(/\n(.*?)<([^>]*)/, /([^<]*)>(.*?)\n$/);
+		        //alert(chunk.startTag + " : " + chunk.startTag.length + "\n" + chunk.endTag + " : " + chunk.endTag.length);	
+
+		        if ((chunk.startTag === chunk.endTag && chunk.endTag == ""))
+		        {
+		            util.extern(insSpecChr);
+			    	return true;
+		        }
+				else
+				{
+		            alert("Possible conflicte per estar adins de tags html...");		    
+		            return false;
+			    }
+
+
+
+
+
+
+
+		    };
+
+
+			util.makeAPI = function(){
+				wmd.wmd = {};
+				wmd.wmd.editor = wmd.editor;
+				wmd.wmd.previewManager = wmd.previewManager;
+			};
+
+			util.startEditor = function(){
+		        util.makeAPI();
+			};
+
+			wmd.previewManager = function(previewPanels){
+
+		        wmd.panels = previewPanels;
+
+				var managerObj = this;
+				var converter;
+				var poller;
+				var timeout;
+				var elapsedTime;
+				var oldInputText;
+				var htmlOut;
+				var maxDelay = 3000;
+				var startType = "delayed"; // The other legal value is "manual"
+
+				// Adds event listeners to elements and creates the input poller.
+				var setupEvents = function(inputElem, listener){
+
+					util.addEvent(inputElem, "input", listener);
+					inputElem.onpaste = listener;
+					inputElem.ondrop = listener;
+
+					util.addEvent(inputElem, "keypress", listener);
+					util.addEvent(inputElem, "keydown", listener);
+					// previewPollInterval is set at the top of this file.
+					poller = new wmd.inputPoller(listener, previewPollInterval);
+				};
+
+				var getDocScrollTop = function(){
+
+					var result = 0;
+
+					if (top.innerHeight) {
+						result = top.pageYOffset;
+					}
+					else 
+						if (doc.documentElement && doc.documentElement.scrollTop) {
+							result = doc.documentElement.scrollTop;
+						}
+						else 
+							if (doc.body) {
+								result = doc.body.scrollTop;
+							}
+
+					return result;
+				};
+
+				var makePreviewHtml = function(){
+
+					// If there are no registered preview and output panels
+					// there is nothing to do.
+					if (!wmd.panels.preview && !wmd.panels.output) {
+						return;
+					}
+
+					var text = wmd.panels.input.value;
+					if (text && text == oldInputText) {
+						return; // Input text hasn't changed.
+					}
+					else {
+						oldInputText = text;
+					}
+
+					var prevTime = new Date().getTime();
+
+					if (!converter && wmd.showdown) {
+						converter = new wmd.showdown.converter();
+					}
+
+					if (converter) {
+						text = converter.makeHtml(text);
+					}
+
+					// Calculate the processing time of the HTML creation.
+					// It's used as the delay time in the event listener.
+					var currTime = new Date().getTime();
+					elapsedTime = currTime - prevTime;
+
+					pushPreviewHtml(text);
+					htmlOut = text;
+				};
+
+				// setTimeout is already used.  Used as an event listener.
+				var applyTimeout = function(){
+
+					if (timeout) {
+						top.clearTimeout(timeout);
+						timeout = undefined;
+					}
+
+					if (startType !== "manual") {
+
+						var delay = 0;
+
+						if (startType === "delayed") {
+							delay = elapsedTime;
+						}
+
+						if (delay > maxDelay) {
+							delay = maxDelay;
+						}
+						timeout = top.setTimeout(makePreviewHtml, delay);
+					}
+				};
+
+				var getScaleFactor = function(panel){
+					if (panel.scrollHeight <= panel.clientHeight) {
+						return 1;
+					}
+					return panel.scrollTop / (panel.scrollHeight - panel.clientHeight);
+				};
+
+				var setPanelScrollTops = function(){
+
+					if (wmd.panels.preview) {
+						wmd.panels.preview.scrollTop = (wmd.panels.preview.scrollHeight - wmd.panels.preview.clientHeight) * getScaleFactor(wmd.panels.preview);
+						;
+					}
+
+					if (wmd.panels.output) {
+						wmd.panels.output.scrollTop = (wmd.panels.output.scrollHeight - wmd.panels.output.clientHeight) * getScaleFactor(wmd.panels.output);
+						;
+					}
+				};
+
+				this.refresh = function(requiresRefresh){
+
+					if (requiresRefresh) {
+						oldInputText = "";
+						makePreviewHtml();
+					}
+					else {
+						applyTimeout();
+					}
+				};
+
+				this.processingTime = function(){
+					return elapsedTime;
+				};
+
+				// The output HTML
+				this.output = function(){
+					return htmlOut;
+				};
+
+				// The mode can be "manual" or "delayed"
+				this.setUpdateMode = function(mode){
+					startType = mode;
+					managerObj.refresh();
+				};
+
+				var isFirstTimeFilled = true;
+
+				var pushPreviewHtml = function(text){
+
+					var emptyTop = position.getTop(wmd.panels.input) - getDocScrollTop();
+
+					// Send the encoded HTML to the output textarea/div.
+					if (wmd.panels.output) {
+						// The value property is only defined if the output is a textarea.
+						if (wmd.panels.output.value !== undefined) {
+							wmd.panels.output.value = text;
+							wmd.panels.output.readOnly = true;
+						}
+						// Otherwise we are just replacing the text in a div.
+						// Send the HTML wrapped in <pre><code>
+						else {
+							var newText = text.replace(/&/g, "&amp;");
+							newText = newText.replace(/</g, "&lt;");
+							wmd.panels.output.innerHTML = "<pre><code>" + newText + "</code></pre>";
+						}
+					}
+
+					if (wmd.panels.preview) {
+						wmd.panels.preview.innerHTML = text;
+					}
+
+					setPanelScrollTops();
+
+					if (isFirstTimeFilled) {
+						isFirstTimeFilled = false;
+						return;
+					}
+
+					var fullTop = position.getTop(wmd.panels.input) - getDocScrollTop();
+
+					if (global.isIE) {
+						top.setTimeout(function(){
+							top.scrollBy(0, fullTop - emptyTop);
+						}, 0);
+					}
+					else {
+						top.scrollBy(0, fullTop - emptyTop);
+					}
+				};
+
+				var init = function(){
+
+					setupEvents(wmd.panels.input, applyTimeout);
+					makePreviewHtml();
+
+					if (wmd.panels.preview) {
+						wmd.panels.preview.scrollTop = 0;
+					}
+					if (wmd.panels.output) {
+						wmd.panels.output.scrollTop = 0;
+					}
+				};
+
+				this.destroy = function(){
+					if (poller) {
+						poller.destroy();
+					}
+				};
+
+				init();
+			};
+
+			// Moves the cursor to the next line and continues lists, quotes and code.
+			command.doAutoindent = function(chunk, postProcessing, useDefaultText){
+
+				chunk.before = chunk.before.replace(/(\n|^)[ ]{0,3}([*+-]|\d+[.])[ \t]*\n$/, "\n\n");
+				chunk.before = chunk.before.replace(/(\n|^)[ ]{0,3}>[ \t]*\n$/, "\n\n");
+				chunk.before = chunk.before.replace(/(\n|^)[ \t]+\n$/, "\n\n");
+
+				useDefaultText = false;
+
+				if(/(\n|^)[ ]{0,3}([*+-])[ \t]+.*\n$/.test(chunk.before)){
+					if(command.doList){
+						command.doList(chunk, postProcessing, false, true);
+					}
+				}
+				if(/(\n|^)[ ]{0,3}(\d+[.])[ \t]+.*\n$/.test(chunk.before)){
+					if(command.doList){
+						command.doList(chunk, postProcessing, true, true);
+					}
+				}
+				if(/(\n|^)[ ]{0,3}>[ \t]+.*\n$/.test(chunk.before)){
+					if(command.doBlockquote){
+						command.doBlockquote(chunk, postProcessing, useDefaultText);
+					}
+				}
+				if(/(\n|^)(\t|[ ]{4,}).*\n$/.test(chunk.before)){
+					if(command.doCode){
+						command.doCode(chunk, postProcessing, useDefaultText);
+					}
+				}
+			};
+
+			// Tab support.
+			command.doTab = function(chunk, postProcessing, useDefaultText){
+
+				if(!chunk.selection && chunk.before.search(/(\n|^|\n[ ]{4,})/) == 0)
+				    chunk.before += "    ";
+				else if (chunk.selection)
+				{
+		    		if(chunk.before.search(/(\n|^|\n[ ]{4,})/) == 0)
+				        chunk.before += "    ";
+				    chunk.selection = chunk.selection.replace(/\n/g,"\n    ");
+				    chunk.selection = chunk.selection.replace(/\n[ ]{4,}$/g,"\n");
+				}
+			};
+
+			// shift tab support.
+			command.doUnTab = function(chunk, postProcessing, useDefaultText){
+			    //alert("working");
+			    if (!chunk.selection)
+			    {
+			        //alert(chunk.before);
+			        chunk.before = chunk.before.replace(/[ ]{4}$/,"");
+		            /*
+		            if(/^\n(.*)(\t|[ ]{4,})/.test(chunk.before))
+		            {
+		                alert("in");
+		                chunk.before.replace(/^\n(.*)(\t|[ ]{4,})/,"\n$1"); 
+		            }
+		            */
+		            //else if(/([^\n])(\t|[ ]{4,}).*\n$/.test(chunk.before))
+		            //    chunk.before.replace(/([^\n])(\t|[ ]{4,})(.*)\n$/,"$1$3\n"); 
+		            //else if(/(<code>).*\n$/.test(chunk.before) && /.*(</code>)\n$/.test(chunk.after)){
+		            //    chunk.before.replace(/([^\n])(\t|[ ]{4,})(.*)\n$/,"$1$3\n"; 
+		        }   
+		        else if (chunk.selection)
+		        {
+		            chunk.before = chunk.before.replace(/[ ]{4}$/,"");
+		            chunk.selection = chunk.selection.replace(/\n[ ]{4}/g,"\n");
+		        }
+			};
+
+			command.doBlockquote = function(chunk, postProcessing, useDefaultText){
+
+				chunk.selection = chunk.selection.replace(/^(\n*)([^\r]+?)(\n*)$/,
+					function(totalMatch, newlinesBefore, text, newlinesAfter){
+						chunk.before += newlinesBefore;
+						chunk.after = newlinesAfter + chunk.after;
+						return text;
+					});
+
+				chunk.before = chunk.before.replace(/(>[ \t]*)$/,
+					function(totalMatch, blankLine){
+						chunk.selection = blankLine + chunk.selection;
+						return "";
+					});
+
+				var defaultText = useDefaultText ? "Citació" : "";
+				chunk.selection = chunk.selection.replace(/^(\s|>)+$/ ,"");
+				chunk.selection = chunk.selection || defaultText;
+
+				if(chunk.before){
+					chunk.before = chunk.before.replace(/\n?$/,"\n");
+				}
+				if(chunk.after){
+					chunk.after = chunk.after.replace(/^\n?/,"\n");
+				}
+
+				chunk.before = chunk.before.replace(/(((\n|^)(\n[ \t]*)*>(.+\n)*.*)+(\n[ \t]*)*$)/,
+					function(totalMatch){
+						chunk.startTag = totalMatch;
+						return "";
+					});
+
+				chunk.after = chunk.after.replace(/^(((\n|^)(\n[ \t]*)*>(.+\n)*.*)+(\n[ \t]*)*)/,
+					function(totalMatch){
+						chunk.endTag = totalMatch;
+						return "";
+					});
+
+				var replaceBlanksInTags = function(useBracket){
+
+					var replacement = useBracket ? "> " : "";
+
+					if(chunk.startTag){
+						chunk.startTag = chunk.startTag.replace(/\n((>|\s)*)\n$/,
+							function(totalMatch, markdown){
+								return "\n" + markdown.replace(/^[ ]{0,3}>?[ \t]*$/gm, replacement) + "\n";
+							});
+					}
+					if(chunk.endTag){
+						chunk.endTag = chunk.endTag.replace(/^\n((>|\s)*)\n/,
+							function(totalMatch, markdown){
+								return "\n" + markdown.replace(/^[ ]{0,3}>?[ \t]*$/gm, replacement) + "\n";
+							});
+					}
+				};
+
+				if(/^(?![ ]{0,3}>)/m.test(chunk.selection)){
+					command.wrap(chunk, wmd.wmd_env.lineLength - 2);
+					chunk.selection = chunk.selection.replace(/^/gm, "> ");
+					replaceBlanksInTags(true);
+					chunk.addBlankLines();
 				}
 				else{
-					chunk.selection = chunk.selection.replace(/^[ ]{4}/gm, "");
-				}
-			}
-		}
-		else{
-			// Use backticks (`) to delimit the code block.
-			
-			chunk.trimWhitespace();
-			chunk.findTags(/`/, /`/);
-			
-			if(!chunk.startTag && !chunk.endTag){
-				chunk.startTag = chunk.endTag="`";
-				if(!chunk.selection){
-					chunk.selection = useDefaultText ? "enter code here" : "";
-				}
-			}
-			else if(chunk.endTag && !chunk.startTag){
-				chunk.before += chunk.endTag;
-				chunk.endTag = "";
-			}
-			else{
-				chunk.startTag = chunk.endTag="";
-			}
-		}
-	};
-	
-	command.doList = function(chunk, postProcessing, isNumberedList, useDefaultText){
-				
-		// These are identical except at the very beginning and end.
-		// Should probably use the regex extension function to make this clearer.
-		var previousItemsRegex = /(\n|^)(([ ]{0,3}([*+-]|\d+[.])[ \t]+.*)(\n.+|\n{2,}([*+-].*|\d+[.])[ \t]+.*|\n{2,}[ \t]+\S.*)*)\n*$/;
-		var nextItemsRegex = /^\n*(([ ]{0,3}([*+-]|\d+[.])[ \t]+.*)(\n.+|\n{2,}([*+-].*|\d+[.])[ \t]+.*|\n{2,}[ \t]+\S.*)*)\n*/;
-		
-		// The default bullet is a dash but others are possible.
-		// This has nothing to do with the particular HTML bullet,
-		// it's just a markdown bullet.
-		var bullet = "-";
-		
-		// The number in a numbered list.
-		var num = 1;
-		
-		// Get the item prefix - e.g. " 1. " for a numbered list, " - " for a bulleted list.
-		var getItemPrefix = function(){
-			var prefix;
-			if(isNumberedList){
-				prefix = " " + num + ". ";
-				num++;
-			}
-			else{
-				prefix = " " + bullet + " ";
-			}
-			return prefix;
-		};
-		
-		// Fixes the prefixes of the other list items.
-		var getPrefixedItem = function(itemText){
-		
-			// The numbering flag is unset when called by autoindent.
-			if(isNumberedList === undefined){
-				isNumberedList = /^\s*\d/.test(itemText);
-			}
-			
-			// Renumber/bullet the list element.
-			itemText = itemText.replace(/^[ ]{0,3}([*+-]|\d+[.])\s/gm,
-				function( _ ){
-					return getItemPrefix();
-				});
-				
-			return itemText;
-		};
-		
-		chunk.findTags(/(\n|^)*[ ]{0,3}([*+-]|\d+[.])\s+/, null);
-		
-		if(chunk.before && !/\n$/.test(chunk.before) && !/^\n/.test(chunk.startTag)){
-			chunk.before += chunk.startTag;
-			chunk.startTag = "";
-		}
-		
-		if(chunk.startTag){
-			
-			var hasDigits = /\d+[.]/.test(chunk.startTag);
-			chunk.startTag = "";
-			chunk.selection = chunk.selection.replace(/\n[ ]{4}/g, "\n");
-			command.unwrap(chunk);
-			chunk.addBlankLines();
-			
-			if(hasDigits){
-				// Have to renumber the bullet points if this is a numbered list.
-				chunk.after = chunk.after.replace(nextItemsRegex, getPrefixedItem);
-			}
-			if(isNumberedList == hasDigits){
-				return;
-			}
-		}
-		
-		var nLinesBefore = 1;
-		
-		chunk.before = chunk.before.replace(previousItemsRegex,
-			function(itemText){
-				if(/^\s*([*+-])/.test(itemText)){
-					bullet = re.$1;
-				}
-				nLinesBefore = /[^\n]\n\n[^\n]/.test(itemText) ? 1 : 0;
-				return getPrefixedItem(itemText);
-			});
-			
-		if(!chunk.selection){
-			chunk.selection = useDefaultText ? "List item" : " ";
-		}
-		
-		var prefix = getItemPrefix();
-		
-		var nLinesAfter = 1;
-		
-		chunk.after = chunk.after.replace(nextItemsRegex,
-			function(itemText){
-				nLinesAfter = /[^\n]\n\n[^\n]/.test(itemText) ? 1 : 0;
-				return getPrefixedItem(itemText);
-			});
-			
-		chunk.trimWhitespace(true);
-		chunk.addBlankLines(nLinesBefore, nLinesAfter, true);
-		chunk.startTag = prefix;
-		var spaces = prefix.replace(/./g, " ");
-		command.wrap(chunk, wmd.wmd_env.lineLength - spaces.length);
-		chunk.selection = chunk.selection.replace(/\n/g, "\n" + spaces);
-		
-	};
-	
-	command.doHeading = function(chunk, postProcessing, useDefaultText){
-		
-		// Remove leading/trailing whitespace and reduce internal spaces to single spaces.
-		chunk.selection = chunk.selection.replace(/\s+/g, " ");
-		chunk.selection = chunk.selection.replace(/(^\s+|\s+$)/g, "");
-		
-		// If we clicked the button with no selected text, we just
-		// make a level 2 hash header around some default text.
-		if(!chunk.selection){
-			chunk.startTag = "## ";
-			chunk.selection = "Heading";
-			chunk.endTag = " ##";
-			return;
-		}
-		
-		var headerLevel = 0;		// The existing header level of the selected text.
-		
-		// Remove any existing hash heading markdown and save the header level.
-		chunk.findTags(/#+[ ]*/, /[ ]*#+/);
-		if(/#+/.test(chunk.startTag)){
-			headerLevel = re.lastMatch.length;
-		}
-		chunk.startTag = chunk.endTag = "";
-		
-		// Try to get the current header level by looking for - and = in the line
-		// below the selection.
-		chunk.findTags(null, /\s?(-+|=+)/);
-		if(/=+/.test(chunk.endTag)){
-			headerLevel = 1;
-		}
-		if(/-+/.test(chunk.endTag)){
-			headerLevel = 2;
-		}
-		
-		// Skip to the next line so we can create the header markdown.
-		chunk.startTag = chunk.endTag = "";
-		chunk.addBlankLines(1, 1);
+					chunk.selection = chunk.selection.replace(/^[ ]{0,3}> ?/gm, "");
+					command.unwrap(chunk);
+					replaceBlanksInTags(false);
 
-		// We make a level 2 header if there is no current header.
-		// If there is a header level, we substract one from the header level.
-		// If it's already a level 1 header, it's removed.
-		var headerLevelToCreate = headerLevel == 0 ? 2 : headerLevel - 1;
-		
-		if(headerLevelToCreate > 0){
-			
-			// The button only creates level 1 and 2 underline headers.
-			// Why not have it iterate over hash header levels?  Wouldn't that be easier and cleaner?
-			var headerChar = headerLevelToCreate >= 2 ? "-" : "=";
-			var len = chunk.selection.length;
-			if(len > wmd.wmd_env.lineLength){
-				len = wmd.wmd_env.lineLength;
-			}
-			chunk.endTag = "\n";
-			while(len--){
-				chunk.endTag += headerChar;
-			}
-		}
-	};	
-	
-	command.doHorizontalRule = function(chunk, postProcessing, useDefaultText){
-		chunk.startTag = "----------\n";
-		chunk.selection = "";
-		chunk.addBlankLines(2, 1, true);
-	}
-};
+					if(!/^(\n|^)[ ]{0,3}>/.test(chunk.selection) && chunk.startTag){
+						chunk.startTag = chunk.startTag.replace(/\n{0,2}$/, "\n\n");
+					}
 
-
-Attacklab.wmd_env = {};
-Attacklab.account_options = {};
-Attacklab.wmd_defaults = {version:1, output:"HTML", lineLength:40, delayLoad:false};
-
-if(!Attacklab.wmd)
-{
-	Attacklab.wmd = function()
-	{
-		Attacklab.loadEnv = function()
-		{
-			var mergeEnv = function(env)
-			{
-				if(!env)
-				{
-					return;
+					if(!/(\n|^)[ ]{0,3}>.*$/.test(chunk.selection) && chunk.endTag){
+						chunk.endTag=chunk.endTag.replace(/^\n{0,2}/, "\n\n");
+					}
 				}
-			
-				for(var key in env)
-				{
-					Attacklab.wmd_env[key] = env[key];
+
+				if(!/\n/.test(chunk.selection)){
+					chunk.selection = chunk.selection.replace(/^(> *)/,
+					function(wholeMatch, blanks){
+						chunk.startTag += blanks;
+						return "";
+					});
 				}
 			};
-			
-			mergeEnv(Attacklab.wmd_defaults);
-			mergeEnv(Attacklab.account_options);
-			mergeEnv(top["wmd_options"]);
-			Attacklab.full = true;
-			
-			var defaultButtons = "bold italic link blockquote code image ol ul heading hr";
-			Attacklab.wmd_env.buttons = Attacklab.wmd_env.buttons || defaultButtons;
+
+			command.doCode = function(chunk, postProcessing, useDefaultText){
+
+				var hasTextBefore = /\S[ ]*$/.test(chunk.before);
+				var hasTextAfter = /^[ ]*\S/.test(chunk.after);
+
+				// Use 'four space' markdown if the selection is on its own
+				// line or is multiline.
+				if((!hasTextAfter && !hasTextBefore) || /\n/.test(chunk.selection)){
+
+					chunk.before = chunk.before.replace(/[ ]{4}$/,
+						function(totalMatch){
+							chunk.selection = totalMatch + chunk.selection;
+							return "";
+						});
+
+					var nLinesBefore = 1;
+					var nLinesAfter = 1;
+
+
+					if(/\n(\t|[ ]{4,}).*\n$/.test(chunk.before) || chunk.after === ""){
+						nLinesBefore = 0; 
+					}
+					if(/^\n(\t|[ ]{4,})/.test(chunk.after)){
+						nLinesAfter = 0; // This needs to happen on line 1
+					}
+
+					chunk.addBlankLines(nLinesBefore, nLinesAfter);
+
+					if(!chunk.selection){
+						chunk.startTag = "    ";
+						chunk.selection = useDefaultText ? "Codí font" : "";
+					}
+					else {
+						if(/^[ ]{0,3}\S/m.test(chunk.selection)){
+							chunk.selection = chunk.selection.replace(/^/gm, "    ");
+						}
+						else{
+							chunk.selection = chunk.selection.replace(/^[ ]{4}/gm, "");
+						}
+					}
+				}
+				else{
+					// Use backticks (`) to delimit the code block.
+
+					chunk.trimWhitespace();
+					chunk.findTags(/`/, /`/);
+
+					if(!chunk.startTag && !chunk.endTag){
+						chunk.startTag = chunk.endTag="`";
+						if(!chunk.selection){
+							chunk.selection = useDefaultText ? "Codí font" : "";
+						}
+					}
+					else if(chunk.endTag && !chunk.startTag){
+						chunk.before += chunk.endTag;
+						chunk.endTag = "";
+					}
+					else{
+						chunk.startTag = chunk.endTag="";
+					}
+				}
+			};
+
+			command.doList = function(chunk, postProcessing, isNumberedList, useDefaultText){
+
+				// These are identical except at the very beginning and end.
+				// Should probably use the regex extension function to make this clearer.
+				var previousItemsRegex = /(\n|^)(([ ]{0,3}([*+-]|\d+[.])[ \t]+.*)(\n.+|\n{2,}([*+-].*|\d+[.])[ \t]+.*|\n{2,}[ \t]+\S.*)*)\n*$/;
+				var nextItemsRegex = /^\n*(([ ]{0,3}([*+-]|\d+[.])[ \t]+.*)(\n.+|\n{2,}([*+-].*|\d+[.])[ \t]+.*|\n{2,}[ \t]+\S.*)*)\n*/;
+
+				// The default bullet is a dash but others are possible.
+				// This has nothing to do with the particular HTML bullet,
+				// it's just a markdown bullet.
+				var bullet = "-";
+
+				// The number in a numbered list.
+				var num = 1;
+
+				// Get the item prefix - e.g. " 1. " for a numbered list, " - " for a bulleted list.
+				var getItemPrefix = function(){
+					var prefix;
+					if(isNumberedList){
+						prefix = " " + num + ". ";
+						num++;
+					}
+					else{
+						prefix = " " + bullet + " ";
+					}
+					return prefix;
+				};
+
+				// Fixes the prefixes of the other list items.
+				var getPrefixedItem = function(itemText){
+
+					// The numbering flag is unset when called by autoindent.
+					if(isNumberedList === undefined){
+						isNumberedList = /^\s*\d/.test(itemText);
+					}
+
+					// Renumber/bullet the list element.
+					itemText = itemText.replace(/^[ ]{0,3}([*+-]|\d+[.])\s/gm,
+						function( _ ){
+							return getItemPrefix();
+						});
+
+					return itemText;
+				};
+
+				chunk.findTags(/(\n|^)*[ ]{0,3}([*+-]|\d+[.])\s+/, null);
+
+				if(chunk.before && !/\n$/.test(chunk.before) && !/^\n/.test(chunk.startTag)){
+					chunk.before += chunk.startTag;
+					chunk.startTag = "";
+				}
+
+				if(chunk.startTag){
+
+					var hasDigits = /\d+[.]/.test(chunk.startTag);
+					chunk.startTag = "";
+					chunk.selection = chunk.selection.replace(/\n[ ]{4}/g, "\n");
+					command.unwrap(chunk);
+					chunk.addBlankLines();
+
+					if(hasDigits){
+						// Have to renumber the bullet points if this is a numbered list.
+						chunk.after = chunk.after.replace(nextItemsRegex, getPrefixedItem);
+					}
+					if(isNumberedList == hasDigits){
+						return;
+					}
+				}
+
+				var nLinesBefore = 1;
+
+				chunk.before = chunk.before.replace(previousItemsRegex,
+					function(itemText){
+						if(/^\s*([*+-])/.test(itemText)){
+							bullet = re.$1;
+						}
+						nLinesBefore = /[^\n]\n\n[^\n]/.test(itemText) ? 1 : 0;
+						return getPrefixedItem(itemText);
+					});
+
+				if(!chunk.selection){
+					chunk.selection = useDefaultText ? "Entrada" : " ";
+				}
+
+				var prefix = getItemPrefix();
+
+				var nLinesAfter = 1;
+
+				chunk.after = chunk.after.replace(nextItemsRegex,
+					function(itemText){
+						nLinesAfter = /[^\n]\n\n[^\n]/.test(itemText) ? 1 : 0;
+						return getPrefixedItem(itemText);
+					});
+
+				chunk.trimWhitespace(true);
+				chunk.addBlankLines(nLinesBefore, nLinesAfter, true);
+				chunk.startTag = prefix;
+				var spaces = prefix.replace(/./g, " ");
+				command.wrap(chunk, wmd.wmd_env.lineLength - spaces.length);
+				chunk.selection = chunk.selection.replace(/\n/g, "\n" + spaces);
+
+			};
+
+		    //modified doHeading with support for <h1 to h6> and undo	
+			command.doHeading = function(chunk, postProcessing, useDefaultText){
+
+				//chunk.trimWhitespace();
+				// Remove leading/trailing whitespace and reduce internal spaces to single spaces.
+				var chunkOrigSel = chunk.selection;
+				chunk.selection = chunk.selection.replace(/\s+/g, " ");
+				chunk.selection = chunk.selection.replace(/(^\s+|\s+$)/g, "");
+				var firstChr = chunk.selection.substring(0, 1);
+				// If we clicked the button with no selected text, we just
+				// make a level 2 hash header around some default text.
+				if(!chunk.selection){
+		            chunk.findTags(/[^\n]/, /[^\n]/);		
+				    if(/[^\n]/.test(chunk.startTag))
+		    			chunk.startTag += "\n\n## ";
+		    		else chunk.startTag = "## ";
+					chunk.selection = "Heading";
+				    if(/[^\n]/.test(chunk.startTag))
+		    			chunk.endTag = " ##\n\n" + chunk.endTag;
+		    		else chunk.endTag = " ##";
+					return;
+				}
+
+				var headerLevel = 0;		// The existing header level of the selected text.
+
+				// Remove any existing hash heading markdown and save the header level.
+				chunk.findTags(/#+[ ]*/, /[ ]*#+/);
+				if(/#+/.test(chunk.startTag)){
+					headerLevel = re.lastMatch.length;
+				}
+				chunk.startTag = chunk.endTag = "";
+
+				var addNewLine = "";
+				if (headerLevel == 0)
+				{
+		            chunk.findTags(/[^\n]/, null);		
+				    if(/[^\n]/.test(chunk.startTag)){
+					    addNewLine = chunk.startTag.substring(0,1);
+				    }
+				    chunk.startTag = chunk.endTag = "";
+				}
+
+				var removeNewLines = false;
+				if (headerLevel < 6) headerLevel++;
+				else if (headerLevel == 6) 
+				{
+				    headerLevel = 0;
+				    removeNewLines = true;
+				}
+
+				var headerChar = "#";
+				var len = headerLevel;
+				if (headerLevel > 0)
+				{
+				    if (headerLevel == 1 && addNewLine != "") 
+				    {
+				        chunk.startTag = addNewLine.replace(/\s+/g, "") + "\n\n";
+				    }
+				    chunk.endTag = " ";
+				    while(len--){
+					    chunk.endTag += headerChar;
+					    chunk.startTag += headerChar;
+				    }
+				    chunk.startTag += " ";
+
+				    if (headerLevel == 1) 
+				    {
+				        chunk.endTag += "\n\n";
+				        chunk.selection = firstChr + chunk.selection;
+				    }
+
+				}
+				else
+				{
+		            chunk.findTags(/[\n]+/, /[\n]+/);		
+			        if(/[\n]+/.test(chunk.startTag)){
+				        chunk.startTag = "";
+			        }
+			        if(/[\n]+/.test(chunk.endTag)){
+				        chunk.endTag = "";
+			        }
+		            chunk.selection = chunkOrigSel;		
+		            chunk.findTags(/[^\n]/, /[^\n]/);		
+			        if(/[^\n]/.test(chunk.startTag)){
+				        chunk.startTag = chunk.startTag.substring(0,1) + " ";
+				        chunk.startTag = chunk.startTag.replace(/\s+/g, " ");
+			        }
+			        if(/[^\n]/.test(chunk.endTag)){
+				        chunk.endTag = " " + chunk.endTag.substring(0,1);
+				        chunk.endTag = chunk.endTag.replace(/\s+/g, " ");
+			        }
+		            chunk.selection = chunkOrigSel;			
+				}
+
+			};	
+
+
+
+			command.doHorizontalRule = function(chunk, postProcessing, useDefaultText){
+				chunk.startTag = "----------\n";
+				chunk.selection = "";
+				chunk.addBlankLines(2, 1, true);
+			}
 		};
-		Attacklab.loadEnv();
 
-	};
-	
-	Attacklab.wmd();
-	Attacklab.wmdBase();
-	Attacklab.Util.startEditor();
-};
 
+		Attacklab.wmd_env = {};
+		Attacklab.account_options = {};
+		Attacklab.wmd_defaults = {version:1, output:"HTML", lineLength:40, delayLoad:false, convertInputBeforeSubmit: false};
+
+		var newAttacklab = function() {
+		    myAttack = {};
+		    myAttack.showdown = Attacklab.showdown;
+		    myAttack.wmd = function(target)
+		    {
+		        target.wmd_env = {};
+		        target.loadEnv = function()
+		        {
+		            var mergeEnv = function(env)
+		            {
+		                if(!env)
+		                {
+		                    return;
+		                }
+
+		                for(var key in env)
+		                {
+		                    target.wmd_env[key] = env[key];
+		                }
+		            };
+
+		            mergeEnv(Attacklab.wmd_defaults);
+		            mergeEnv(Attacklab.account_options);
+		            mergeEnv(top["wmd_options"]);
+		            target.full = true;
+
+		            var defaultButtons = "bold italic link blockquote code image ol ul heading hr";
+		            target.wmd_env.buttons = Attacklab.wmd_env.buttons || defaultButtons;
+		        };
+		        target.loadEnv();
+
+		    };
+		    myAttack.wmd(myAttack);
+		    Attacklab.wmdBase(myAttack);
+		    myAttack.Util.startEditor();
+		    return myAttack;
+		}
+
+
+		//return attacklab instead of editor
+		//this allows us to avoid errors using ajax callbacks 
+		function createWmd(textarea, preview, edCon)
+		{
+		    if (!Attacklab) {
+		        alert("WMD està carregant...!");
+		        return null;
+		    }
+
+		    if(!jQuery) {
+		        alert("Aquesta versió de WMD necesita jQuery.");
+		        return null;
+		    }
+
+		    var domTextarea = $(textarea)[0];
+
+		    var panes = {
+		        input: domTextarea,
+		        preview: $(preview)[0]
+		    };
+
+		    var attacklab = newAttacklab();
+		    attacklab.Global.edContext = edCon;
+		    var previewManager = new attacklab.wmd.previewManager(panes);
+
+		    var editor = new attacklab.wmd.editor(domTextarea, previewManager.refresh);
+		    //I used wmdInstance to get access to the attacklab functions
+		    //once I've created at least one instance
+		    //if (wmdInstance == null) wmdInstance = attacklab;
+
+
+		    //When you have several instances on one page
+		    //it's sometimes important to kill the instance to avoid errors
+		    //this happened to me especially when I tried to update the whole editor region
+		    //with ajax callbacks switching for example from one document to another.
+		    //As I didn't wanted to reload the whole page the events got mad and produced errors...
+		    //Combined with try catch and setting the editor instance to null
+		    //you can re-create the editor object and everything you need arround (title field, comments, etc.)
+		    //with two lines of code.
+		    //For this reason I return the whole object and not only the editor...
+		    //Additionally you get access to all the other instance specific stuff and variables 
+		    //which allows you to enhance the editor
+		    return attacklab;
+		}
