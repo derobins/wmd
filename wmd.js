@@ -92,15 +92,12 @@ Attacklab.wmdBase = function(){
 	// Returns true if the DOM element is visible, false if it's hidden.
 	// Checks if display is anything other than none.
 	util.isVisible = function (elem) {
-	
-	    if (window.getComputedStyle) {
-	        // Most browsers
-			return window.getComputedStyle(elem, null).getPropertyValue("display") !== "none";
-		}
-		else if (elem.currentStyle) {
-		    // IE
-			return elem.currentStyle["display"] !== "none";
-		}
+	    while (elem && elem.parentNode) {
+	        if (elem.style.display == 'none' || elem.style.visibility == 'hidden')
+	                return false;
+        	elem = elem.parentNode;
+    	    }
+	    return true;
 	};
 	
 	
