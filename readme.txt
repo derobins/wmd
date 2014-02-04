@@ -35,8 +35,7 @@ Installing WMD
 5. Pop open the source to change the variables at the top that require
    changing (image paths, dialogs, etc.).
 
-6. I'd minify the source.  It'll get a LOT smaller.  Eventually I'll provide a
-   minified version.
+6. There are minified versions of all the .js and .css files, as $file-minified.$extension.
    
   
  
